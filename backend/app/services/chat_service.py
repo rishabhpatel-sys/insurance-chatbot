@@ -103,6 +103,28 @@ def stream_answer(user_message: str):
             temperature=0.0,
         ) as stream:
             sent_text = ""
+            def _compute_new_part(sent: str, incoming: str) -> str:
+                # If identical (possibly with whitespace), ignore
+                if incoming == sent or incoming.strip() == sent.strip():
+                    return ""
+                # If incoming is cumulative and starts with sent, send suffix only
+                if incoming.startswith(sent):
+                    return incoming[len(sent):]
+                # If sent ends with incoming (incoming duplicate of tail), nothing new
+                if sent.endswith(incoming):
+                    return ""
+                # Otherwise find the longest overlap between end of sent and start of incoming
+                max_ol = 0
+                max_i = min(len(sent), len(incoming))
+                for i in range(max_i, 0, -1):
+                    if sent.endswith(incoming[:i]):
+                        max_ol = i
+                        break
+                if max_ol > 0:
+                    return incoming[max_ol:]
+                # no overlap, return full incoming
+                return incoming
+
             for event in stream:
                 data = None
                 try:
@@ -115,6 +137,7 @@ def stream_answer(user_message: str):
                             first = event['choices'][0]
                             delta = first.get('delta')
                             if delta:
+                                # prefer explicit content fields
                                 data = delta.get('content') or delta.get('text')
                             else:
                                 data = first.get('message', {}).get('content')
@@ -125,15 +148,13 @@ def stream_answer(user_message: str):
 
                 if data:
                     s = str(data)
-                    new_part = s
-                    if s.startswith(sent_text):
-                        new_part = s[len(sent_text):]
-                    elif sent_text and sent_text.endswith(s):
-                        new_part = ""
+                    new_part = _compute_new_part(sent_text, s)
 
                     if new_part:
+                        # send as SSE safe: split into lines so client's onmessage receives each line as data
                         for line in new_part.splitlines():
                             yield f"data: {line}\n"
+                        # terminate event
                         yield "\n"
                         sent_text += new_part
     except Exception as e:
