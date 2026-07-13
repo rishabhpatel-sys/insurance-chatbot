@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 
-from backend.app.ingest import ingest_document
+from backend.app.services.ingest_service import ingest_document
 
 DATA_DIR = Path(__file__).resolve().parents[1].parent / 'data'
 # adjust: data folder is at repo root /data
