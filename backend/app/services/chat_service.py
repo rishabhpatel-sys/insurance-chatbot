@@ -129,18 +129,29 @@ def stream_answer(user_message: str):
                 data = None
                 try:
                     if hasattr(event, 'delta') and getattr(event, 'delta'):
-                        data = getattr(event, 'delta')
+                        delta_value = getattr(event, 'delta')
+                        if isinstance(delta_value, dict):
+                            data = delta_value.get('content') or delta_value.get('text')
+                        else:
+                            data = delta_value
                     elif hasattr(event, 'content') and getattr(event, 'content'):
-                        data = getattr(event, 'content')
+                        content_value = getattr(event, 'content')
+                        if isinstance(content_value, dict):
+                            data = content_value.get('content') or content_value.get('text')
+                        else:
+                            data = content_value
                     elif isinstance(event, dict):
                         if 'choices' in event:
                             first = event['choices'][0]
                             delta = first.get('delta')
                             if delta:
-                                # prefer explicit content fields
                                 data = delta.get('content') or delta.get('text')
                             else:
-                                data = first.get('message', {}).get('content')
+                                msg = first.get('message', {})
+                                if isinstance(msg, dict):
+                                    data = msg.get('content')
+                                else:
+                                    data = msg
                     if not data and hasattr(event, 'get'):
                         data = event.get('text') or event.get('content')
                 except Exception:
@@ -151,10 +162,8 @@ def stream_answer(user_message: str):
                     new_part = _compute_new_part(sent_text, s)
 
                     if new_part:
-                        # send as SSE safe: split into lines so client's onmessage receives each line as data
                         for line in new_part.splitlines():
                             yield f"data: {line}\n"
-                        # terminate event
                         yield "\n"
                         sent_text += new_part
     except Exception as e:

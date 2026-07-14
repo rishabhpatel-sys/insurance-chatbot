@@ -46,16 +46,32 @@ export default function Home() {
     evtRef.current = evtSource
     let botText = ''
 
+    const computeNewSuffix = (sent, incoming) => {
+      if (incoming === sent || incoming.trim() === sent.trim()) return ''
+      if (incoming.startsWith(sent)) return incoming.slice(sent.length)
+      if (sent.endsWith(incoming)) return ''
+      let maxOverlap = 0
+      const maxLen = Math.min(sent.length, incoming.length)
+      for (let i = maxLen; i > 0; i--) {
+        if (sent.endsWith(incoming.slice(0, i))) {
+          maxOverlap = i
+          break
+        }
+      }
+      return maxOverlap > 0 ? incoming.slice(maxOverlap) : incoming
+    }
+
     evtSource.onmessage = (e) => {
       const payload = e.data || ''
-      botText += payload
+      const newSuffix = computeNewSuffix(botText, payload)
+      if (!newSuffix) return
+      botText += newSuffix
       updateBotLast(botText)
     }
 
     evtSource.addEventListener('sources', (e) => {
       try {
         const sources = JSON.parse(e.data)
-        // Attach sources metadata to the last bot message without inserting them into the text body
         updateBotLast(botText, { sources })
       } catch (err) {
         // ignore parse error
