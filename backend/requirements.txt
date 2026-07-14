@@ -8,3 +8,4 @@ pydantic
 requests
 tqdm
 python-dotenv
+PyPDF2

@@ -1,8 +1,8 @@
-from fastapi import APIRouter, Query, HTTPException
+from fastapi import APIRouter, Query, HTTPException, Request, UploadFile, File, Form
 from fastapi.responses import StreamingResponse, HTMLResponse
 import html
 
-from backend.app.controllers.chat_controller import upload_document, chat, chat_stream, sse_chat, get_source_html
+from backend.app.controllers.chat_controller import upload_document, upload_document_file, chat, chat_stream, sse_chat
 from backend.app.models.schemas import UploadRequest, ChatRequest
 from backend.app.services.ingest_service import get_qdrant_client, QDRANT_COLLECTION
 
@@ -10,8 +10,20 @@ router = APIRouter()
 
 
 @router.post("/upload-document")
-async def upload_document_route(req: UploadRequest):
-    return upload_document(req)
+async def upload_document_route(
+    request: Request,
+    title: str | None = Form(None),
+    content: str | None = Form(None),
+    source: str | None = Form(None),
+    file: UploadFile | None = File(None),
+):
+    content_type = request.headers.get("content-type", "")
+    if content_type.startswith("application/json"):
+        data = await request.json()
+        req = UploadRequest(**data)
+        return upload_document(req)
+
+    return await upload_document_file(title=title, content=content, source=source, file=file)
 
 
 @router.post("/chat")

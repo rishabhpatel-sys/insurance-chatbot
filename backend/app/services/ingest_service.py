@@ -1,4 +1,5 @@
 import os
+from io import BytesIO
 from typing import List
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from qdrant_client import QdrantClient
@@ -20,6 +21,42 @@ def chunk_text(text: str) -> List[str]:
         chunk_overlap=200,
     )
     return splitter.split_text(text)
+
+
+def parse_uploaded_file(file) -> str:
+    file_bytes = file.file.read()
+    filename = (getattr(file, 'filename', None) or '').lower()
+    content_type = getattr(file, 'content_type', '').lower()
+
+    if filename.endswith('.pdf') or content_type == 'application/pdf':
+        try:
+            from PyPDF2 import PdfReader
+        except ImportError as err:
+            raise RuntimeError('PDF support requires PyPDF2. Install backend/requirements.txt again.') from err
+
+        try:
+            reader = PdfReader(BytesIO(file_bytes))
+            pages = []
+            for page in reader.pages:
+                page_text = page.extract_text() or ''
+                pages.append(page_text)
+            text = '\n\n'.join(pages).strip()
+        except Exception as err:
+            raise RuntimeError(f'Unable to extract text from PDF: {err}') from err
+    else:
+        try:
+            text = file_bytes.decode('utf-8')
+        except UnicodeDecodeError:
+            try:
+                text = file_bytes.decode('latin-1')
+            except UnicodeDecodeError as err:
+                raise RuntimeError('Unable to decode uploaded file. Please upload plain text, markdown, or PDF.') from err
+        text = text.strip()
+
+    if not text:
+        raise RuntimeError('Uploaded file contained no text.')
+
+    return text
 
 
 def ingest_document(title: str, content: str, metadata: dict = None):

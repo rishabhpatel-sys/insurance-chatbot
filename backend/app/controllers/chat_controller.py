@@ -1,6 +1,6 @@
 from fastapi import HTTPException
 from backend.app.models.schemas import UploadRequest, ChatRequest
-from backend.app.services.ingest_service import ingest_document
+from backend.app.services.ingest_service import ingest_document, parse_uploaded_file
 from backend.app.services.chat_service import answer_query, stream_answer
 
 
@@ -8,6 +8,26 @@ def upload_document(req: UploadRequest):
     try:
         num = ingest_document(req.title, req.content, req.metadata or {})
         return {"status": "ok", "chunks_indexed": num}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+async def upload_document_file(title: str | None = None, content: str | None = None, source: str | None = None, file=None):
+    try:
+        if file is not None:
+            content = parse_uploaded_file(file)
+            if not title:
+                title = file.filename.rsplit('.', 1)[0] if file.filename else 'uploaded_document'
+            source = source or file.filename
+
+        if not title or not content:
+            raise HTTPException(status_code=400, detail='Please provide a title and content or upload a supported file.')
+
+        metadata = {"source": source} if source else {}
+        num = ingest_document(title, content, metadata)
+        return {"status": "ok", "chunks_indexed": num}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

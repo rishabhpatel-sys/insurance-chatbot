@@ -36,8 +36,8 @@ Quick start (dev)
 
 Notes
 
-- The backend expects OPENAI_API_KEY in env. The ingestion endpoint accepts JSON {"title": "...", "content": "..."} for demo simplicity.
-- Use the Next.js app at /upload to upload .txt or .md documents and improve the RAG context.
+- The backend expects OPENAI_API_KEY in env. The ingestion endpoint accepts JSON {"title": "...", "content": "..."} or multipart uploads including .txt, .md, and .pdf files.
+- Use the Next.js app at /upload to upload .txt, .md, or .pdf documents and improve the RAG context.
 
 Files of interest
 
