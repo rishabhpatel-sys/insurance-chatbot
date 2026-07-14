@@ -9,3 +9,6 @@ requests
 tqdm
 python-dotenv
 PyPDF2
+pytesseract
+pypdfium2
+Pillow
