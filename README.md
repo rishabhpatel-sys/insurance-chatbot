@@ -7,6 +7,7 @@ This repository contains a minimal demo of an insurance chatbot using:
 - Qdrant as vector DB (docker-compose included)
 - OpenAI embeddings & LLM
 - A tiny static frontend to demo the chat UI
+- A Next.js streaming demo with document upload support
 
 This is a demo intended for 5-10 users and ~20 documents.
 
@@ -29,21 +30,27 @@ Quick start (dev)
 4. Start the backend:
    uvicorn backend.app.main:app --reload --host 0.0.0.0 --port 8000
 5. Open frontend/index.html in your browser (or serve it) and point the API host to http://localhost:8000
+6. (Optional) Start the Next.js frontend for the streaming demo and upload page:
+   cd frontend/next-app && npm install && npm run dev
+   Then open http://localhost:3000 and visit /upload to add documents.
 
 Notes
 
 - The backend expects OPENAI_API_KEY in env. The ingestion endpoint accepts JSON {"title": "...", "content": "..."} for demo simplicity.
-- For production use, secure the endpoints, add authentication, use managed Qdrant or provision storage, and follow the system design in the project plan.
+- Use the Next.js app at /upload to upload .txt or .md documents and improve the RAG context.
 
 Files of interest
 
 - backend/app/main.py - FastAPI application and endpoints
-- backend/app/ingest.py - ingestion and indexing helpers
-- backend/app/chat.py - chat endpoint and RAG logic
-- docker-compose.yml - starts Qdrant for local dev
+- backend/app/services/ingest_service.py - ingestion and indexing helpers
+- backend/app/services/chat_service.py - chat endpoint and RAG logic
+- backend/app/routes/chat_routes.py - API routes
 - frontend/index.html - minimal chat UI that talks to backend
+- frontend/next-app/pages/index.js - Next.js streaming chat UI
+- frontend/next-app/pages/upload.js - Next.js document upload page
+- docker-compose.yml - starts Qdrant for local dev
 
 Next steps
 
-- Upload real policy/claim documents via /upload-document
+- Upload real policy/claim documents via /upload
 - Test chat by sending queries to /chat

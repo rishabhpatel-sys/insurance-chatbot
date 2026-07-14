@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { useState, useRef, useEffect } from 'react'
 
 export default function Home() {
@@ -21,7 +22,6 @@ export default function Home() {
     const encoded = encodeURIComponent(userText)
     const url = `http://localhost:8000/sse?message=${encoded}`
 
-    // add placeholder bot message
     setMessages((m) => [...m, { role: 'bot', text: '', timestamp: new Date().toLocaleTimeString(), typing: true }])
 
     const updateBotLast = (text, extras) => {
@@ -89,12 +89,17 @@ export default function Home() {
 
   return (
     <div style={{ padding: 20, maxWidth: 900, margin: '0 auto', fontFamily: 'Inter, Arial, sans-serif' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-        <div style={{ width: 44, height: 44, borderRadius: 10, background: 'linear-gradient(135deg,#4f46e5,#06b6d4)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700 }}>IC</div>
-        <div>
-          <h2 style={{ margin: 0 }}>Insurance Chatbot</h2>
-          <div style={{ color: '#6b7280', fontSize: 13 }}>Streaming demo — powered by Qdrant + OpenAI</div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ width: 44, height: 44, borderRadius: 10, background: 'linear-gradient(135deg,#4f46e5,#06b6d4)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700 }}>IC</div>
+          <div>
+            <h2 style={{ margin: 0 }}>Insurance Chatbot</h2>
+            <div style={{ color: '#6b7280', fontSize: 13 }}>Streaming demo — powered by Qdrant + OpenAI</div>
+          </div>
         </div>
+        <Link href="/upload" style={{ textDecoration: 'none' }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: '#2563eb', color: 'white', borderRadius: 10, padding: '10px 14px', cursor: 'pointer', fontWeight: 600 }}>Upload Documents</span>
+        </Link>
       </div>
 
       <div style={{ borderRadius: 12, border: '1px solid #e6eef8', overflow: 'hidden', boxShadow: '0 6px 18px rgba(15,23,42,0.06)' }}>
