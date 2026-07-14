@@ -23,6 +23,33 @@ def chunk_text(text: str) -> List[str]:
     return splitter.split_text(text)
 
 
+def ocr_pdf_bytes(file_bytes: bytes) -> str:
+    try:
+        import pypdfium2 as pdfium
+        import pytesseract
+    except ImportError as err:
+        raise RuntimeError('OCR support requires pypdfium2, pytesseract, and Pillow. Install backend/requirements.txt again.') from err
+
+    text_parts = []
+    try:
+        pdf = pdfium.PdfDocument(BytesIO(file_bytes))
+        for page_num in range(len(pdf)):
+            page = pdf.get_page(page_num)
+            try:
+                pil_image = page.render_topil(scale=2)
+                page_text = pytesseract.image_to_string(pil_image)
+                if page_text:
+                    text_parts.append(page_text.strip())
+            finally:
+                page.close()
+    except pytesseract.TesseractNotFoundError as err:
+        raise RuntimeError('Tesseract OCR binary not found. Install tesseract-ocr on your system for scanned PDF support.') from err
+    except Exception as err:
+        raise RuntimeError(f'Unable to OCR PDF: {err}') from err
+
+    return '\n\n'.join(text_parts).strip()
+
+
 def parse_uploaded_file(file) -> str:
     file_bytes = file.file.read()
     filename = (getattr(file, 'filename', None) or '').lower()
@@ -40,9 +67,14 @@ def parse_uploaded_file(file) -> str:
             for page in reader.pages:
                 page_text = page.extract_text() or ''
                 pages.append(page_text)
-            text = '\n\n'.join(pages).strip()
+            text = '\n\n'.join(page_text for page_text in pages if page_text).strip()
         except Exception as err:
             raise RuntimeError(f'Unable to extract text from PDF: {err}') from err
+
+        if not text:
+            text = ocr_pdf_bytes(file_bytes)
+            if text:
+                text = text.strip()
     else:
         try:
             text = file_bytes.decode('utf-8')
