@@ -1,28 +1,35 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 
 export default function Home() {
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
-  const controllerRef = useRef(null)
+  const evtRef = useRef(null)
+
+  useEffect(() => {
+    return () => {
+      if (evtRef.current) evtRef.current.close()
+    }
+  }, [])
 
   async function sendMessage(e) {
     e?.preventDefault()
     if (!input.trim()) return
     const userText = input.trim()
-    setMessages((m) => [...m, { role: 'user', text: userText }])
+    setMessages((m) => [...m, { role: 'user', text: userText, timestamp: new Date().toLocaleTimeString() }])
     setInput('')
 
-    // Use EventSource (SSE) via GET to avoid preflight issues
     const encoded = encodeURIComponent(userText)
     const url = `http://localhost:8000/sse?message=${encoded}`
 
-    setMessages((m) => [...m, { role: 'bot', text: '' }])
-    const updateBotLast = (text) => {
+    // add placeholder bot message
+    setMessages((m) => [...m, { role: 'bot', text: '', timestamp: new Date().toLocaleTimeString(), typing: true }])
+
+    const updateBotLast = (text, extras) => {
       setMessages((m) => {
         const copy = [...m]
         for (let i = copy.length - 1; i >= 0; i--) {
           if (copy[i].role === 'bot') {
-            copy[i] = { role: 'bot', text }
+            copy[i] = { ...copy[i], text, typing: false, ...(extras || {}) }
             break
           }
         }
@@ -30,7 +37,13 @@ export default function Home() {
       })
     }
 
+    if (evtRef.current) {
+      evtRef.current.close()
+      evtRef.current = null
+    }
+
     const evtSource = new EventSource(url)
+    evtRef.current = evtSource
     let botText = ''
 
     evtSource.onmessage = (e) => {
@@ -42,54 +55,65 @@ export default function Home() {
     evtSource.addEventListener('sources', (e) => {
       try {
         const sources = JSON.parse(e.data)
-        botText += '\n\nSources: ' + sources.map(s => s.title + '#' + s.chunk_index).join(', ')
-        updateBotLast(botText)
+        // Attach sources metadata to the last bot message without inserting them into the text body
+        updateBotLast(botText, { sources })
       } catch (err) {
         // ignore parse error
       }
       evtSource.close()
+      evtRef.current = null
     })
 
     evtSource.onerror = (err) => {
-      botText += ' Error: network or server error'
-      updateBotLast(botText)
+      updateBotLast('Error: network or server error')
       evtSource.close()
+      evtRef.current = null
     }
   }
 
   return (
-    <div style={{ padding: 20, maxWidth: 800, margin: '0 auto', fontFamily: 'Arial' }}>
-      <h1>Insurance Chatbot (Next.js Streaming Demo)</h1>
-      <div style={{ border: '1px solid #ccc', padding: 12, height: '60vh', overflow: 'auto' }}>
-        {messages.map((m, i) => (
-          <div key={i} style={{ marginBottom: 12 }}>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-              <b style={{ color: m.role === 'user' ? 'blue' : 'green' }}>{m.role === 'user' ? 'You' : 'Bot'}:</b>
-              <span style={{ color: '#555', fontSize: '0.85rem' }}>{m.timestamp}</span>
-            </div>
-            <div style={{ marginTop: 6, whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>
-              {m.text}
-              {m.typing ? <span style={{ display: 'inline-block', width: 10, marginLeft: 6, animation: 'blink 1s step-end infinite' }}>█</span> : null}
-            </div>
-            {m.sources && m.sources.length ? (
-              <div style={{ marginTop: 6, fontSize: '0.9rem' }}>
-                Sources: {m.sources.map((s, idx) => (
-                  <a key={idx} href={`http://localhost:8000/source?title=${encodeURIComponent(s.title)}&chunk_index=${s.chunk_index}`} target="_blank" rel="noreferrer" style={{ marginRight: 8 }}>{s.title}#{s.chunk_index}</a>
-                ))}
-              </div>
-            ) : null}
-          </div>
-        ))}
+    <div style={{ padding: 20, maxWidth: 900, margin: '0 auto', fontFamily: 'Inter, Arial, sans-serif' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+        <div style={{ width: 44, height: 44, borderRadius: 10, background: 'linear-gradient(135deg,#4f46e5,#06b6d4)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700 }}>IC</div>
+        <div>
+          <h2 style={{ margin: 0 }}>Insurance Chatbot</h2>
+          <div style={{ color: '#6b7280', fontSize: 13 }}>Streaming demo — powered by Qdrant + OpenAI</div>
+        </div>
       </div>
 
-      <form onSubmit={sendMessage} style={{ marginTop: 12 }}>
-        <input value={input} onChange={(e) => setInput(e.target.value)} placeholder="Ask about policies, claims..." style={{ width: '70%', padding: 8 }} />
-        <button style={{ padding: '8px 12px', marginLeft: 8 }}>Send</button>
-      </form>
+      <div style={{ borderRadius: 12, border: '1px solid #e6eef8', overflow: 'hidden', boxShadow: '0 6px 18px rgba(15,23,42,0.06)' }}>
+        <div style={{ padding: 16, height: '64vh', overflow: 'auto', background: 'linear-gradient(180deg,#fbfcff,#ffffff)' }}>
+          {messages.length === 0 ? (
+            <div style={{ textAlign: 'center', color: '#9ca3af', marginTop: 60 }}>Start the chat — ask about policies, claims, or offers</div>
+          ) : (
+            messages.map((m, i) => (
+              <div key={i} style={{ display: 'flex', flexDirection: m.role === 'user' ? 'row-reverse' : 'row', gap: 12, marginBottom: 12, alignItems: 'flex-end' }}>
+                <div style={{ width: 40, height: 40, borderRadius: 8, background: m.role === 'user' ? '#e0f2fe' : '#eef2ff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: m.role === 'user' ? '#035388' : '#0b3677', fontWeight: 700 }}>{m.role === 'user' ? 'Y' : 'B'}</div>
+                <div style={{ maxWidth: '78%' }}>
+                  <div style={{ background: m.role === 'user' ? '#e6f0ff' : '#f8fafc', padding: '12px 14px', borderRadius: 12, border: '1px solid #eef6ff', whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>
+                    {m.text || (m.typing ? '...' : '')}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+                    <span style={{ color: '#9ca3af', fontSize: 12 }}>{m.timestamp}</span>
+                    {m.sources && m.sources.length ? (
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        {m.sources.map((s, idx) => (
+                          <a key={idx} href={`http://localhost:8000/source?title=${encodeURIComponent(s.title)}&chunk_index=${s.chunk_index}`} target="_blank" rel="noreferrer" style={{ padding: '6px 8px', background: '#eef2ff', borderRadius: 999, fontSize: 12, color: '#0b3d91', textDecoration: 'none' }}>{s.title}#{s.chunk_index}</a>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
 
-      <style jsx>{`
-        @keyframes blink { 50% { opacity: 0 } }
-      `}</style>
+        <form onSubmit={sendMessage} style={{ display: 'flex', gap: 12, padding: 12, borderTop: '1px solid #eef2ff', alignItems: 'center', background: '#ffffff' }}>
+          <input value={input} onChange={(e) => setInput(e.target.value)} placeholder="Ask about policies, claims, or offers..." style={{ flex: 1, padding: '10px 12px', borderRadius: 10, border: '1px solid #e6eef8', outline: 'none' }} />
+          <button type="submit" style={{ background: '#2563eb', color: 'white', border: 'none', padding: '10px 14px', borderRadius: 10, cursor: 'pointer', fontWeight: 600 }}>Send</button>
+        </form>
+      </div>
     </div>
   )
 }

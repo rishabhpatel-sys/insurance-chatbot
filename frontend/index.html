@@ -3,53 +3,138 @@
 <head>
   <meta charset="utf-8" />
   <title>Insurance Chatbot Demo</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
-    body { font-family: Arial, sans-serif; max-width: 720px; margin: 2rem auto; }
-    #chat { border: 1px solid #ddd; padding: 1rem; height: 60vh; overflow:auto }
-    .msg { margin: .5rem 0 }
-    .user { color: blue }
-    .bot { color: green }
+    :root{
+      --bg:#f6f9fc; --card:#ffffff; --primary:#0066ff; --muted:#6b7280;
+      --user-bg:#e6f0ff; --bot-bg:#f1f5f9; --accent:#0ea5a4;
+    }
+    *{box-sizing:border-box}
+    body{font-family:Inter, Roboto, Arial, sans-serif;background:linear-gradient(180deg,#eef2ff 0%,#f6fbff 100%);min-height:100vh;margin:0;display:flex;align-items:center;justify-content:center;padding:24px}
+    .app{width:100%;max-width:920px;background:var(--card);border-radius:12px;box-shadow:0 8px 30px rgba(16,24,40,0.08);overflow:hidden;display:flex;flex-direction:column}
+    header{display:flex;align-items:center;gap:12px;padding:20px 24px;background:linear-gradient(90deg,var(--primary),#7c3aed);color:#fff}
+    header h1{font-size:1.1rem;margin:0}
+    header p{margin:0;font-size:0.85rem;opacity:0.9}
+
+    .chat-wrap{padding:20px;display:flex;flex-direction:column;gap:12px;height:64vh}
+    .messages{flex:1;overflow:auto;padding-right:8px;display:flex;flex-direction:column;gap:12px}
+
+    .message{display:flex;gap:12px;align-items:flex-end}
+    .message.user{justify-content:flex-end}
+    .bubble{max-width:72%;padding:12px 14px;border-radius:12px;line-height:1.4;color:#0f172a}
+    .bubble.bot{background:var(--bot-bg);border-top-left-radius:4px}
+    .bubble.user{background:var(--user-bg);border-top-right-radius:4px}
+
+    .meta{display:block;font-size:0.75rem;color:var(--muted);margin-top:6px}
+    .sources{margin-top:6px;display:flex;gap:8px;flex-wrap:wrap}
+    .chip{background:#eef2ff;border-radius:999px;padding:6px 10px;font-size:0.8rem;color:#0b3d91;text-decoration:none}
+
+    .composer{display:flex;gap:12px;padding:12px 20px;border-top:1px solid #eef2ff;background:linear-gradient(180deg,rgba(255,255,255,0.8),rgba(255,255,255,0.95))}
+    .input{flex:1;display:flex;gap:8px;align-items:center;background:#f8fafc;border:1px solid #e6eef8;padding:8px 10px;border-radius:999px}
+    .input input{flex:1;border:0;background:transparent;font-size:0.95rem;padding:8px;outline:none}
+    .send{background:var(--primary);color:#fff;border:0;padding:10px 14px;border-radius:999px;cursor:pointer;font-weight:600}
+    .send:active{transform:translateY(1px)}
+
+    .empty{color:var(--muted);text-align:center;padding:20px}
+
+    @media (max-width:640px){.app{border-radius:8px;width:100%;height:100vh;max-width:100%}.chat-wrap{height:calc(100vh - 140px)} }
   </style>
 </head>
 <body>
-  <h1>Insurance Chatbot (Demo)</h1>
-  <div id="chat"></div>
-  <form id="form">
-    <input id="input" placeholder="Ask about policies, claims, offers..." style="width:80%" />
-    <button type="submit">Send</button>
-  </form>
+  <div class="app">
+    <header>
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="24" height="24" rx="6" fill="#fff" opacity="0.06"/><path d="M6 12h12M6 8h12M6 16h12" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <div>
+        <h1>Insurance Chatbot</h1>
+        <p>Ask about policies, claims, offers — powered by RAG demo</p>
+      </div>
+    </header>
+
+    <div class="chat-wrap">
+      <div id="messages" class="messages">
+        <div class="empty">Welcome — ask me about insurance policies or claim process</div>
+      </div>
+
+      <form id="form" class="composer" onsubmit="return false;">
+        <div class="input">
+          <input id="input" placeholder="Ask about policies, claims, offers..." aria-label="Message input" />
+        </div>
+        <button id="send" class="send">Send</button>
+      </form>
+    </div>
+  </div>
 
   <script>
     const apiBase = location.hostname === 'localhost' ? 'http://localhost:8000' : ''
-    const chatEl = document.getElementById('chat')
+    const messagesEl = document.getElementById('messages')
     const form = document.getElementById('form')
     const input = document.getElementById('input')
+    const sendBtn = document.getElementById('send')
 
-    function addMsg(text, cls){
-      const d = document.createElement('div'); d.className='msg '+cls; d.textContent=text; chatEl.appendChild(d); chatEl.scrollTop = chatEl.scrollHeight;
+    function scrollToBottom(){ messagesEl.scrollTop = messagesEl.scrollHeight }
+
+    function renderMessage(text, role, sources){
+      const empty = messagesEl.querySelector('.empty')
+      if(empty) empty.remove()
+
+      const wrap = document.createElement('div')
+      wrap.className = 'message ' + (role === 'user' ? 'user' : 'bot')
+
+      const bubble = document.createElement('div')
+      bubble.className = 'bubble ' + (role === 'user' ? 'user' : 'bot')
+      bubble.innerText = text
+
+      wrap.appendChild(bubble)
+
+      if(sources && sources.length){
+        const meta = document.createElement('div')
+        meta.className = 'meta'
+        const chipWrap = document.createElement('div')
+        chipWrap.className = 'sources'
+        sources.forEach(s => {
+          const a = document.createElement('a')
+          a.className = 'chip'
+          a.href = `${apiBase}/source?title=${encodeURIComponent(s.title)}&chunk_index=${s.chunk_index}`
+          a.target = '_blank'
+          a.rel = 'noreferrer'
+          a.textContent = s.title + '#' + s.chunk_index
+          chipWrap.appendChild(a)
+        })
+        bubble.appendChild(meta)
+        bubble.appendChild(chipWrap)
+      }
+
+      messagesEl.appendChild(wrap)
+      scrollToBottom()
     }
 
-    form.addEventListener('submit', async (e)=>{
-      e.preventDefault();
+    function setThinking(){
+      const last = [...messagesEl.querySelectorAll('.message')].slice(-1)[0]
+      if(last && last.classList.contains('bot')) return
+      renderMessage('Thinking...', 'bot')
+    }
+
+    async function send(){
       const text = input.value.trim(); if(!text) return;
-      addMsg('You: '+text, 'user')
-      input.value=''
-      addMsg('Thinking...', 'bot')
+      renderMessage(text, 'user')
+      input.value = ''
+      setThinking()
 
       try{
-        const res = await fetch(apiBase + '/chat', {
-          method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({message: text})
-        })
+        const res = await fetch(apiBase + '/chat', {method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({message: text})})
         const data = await res.json()
-        chatEl.lastChild.textContent = 'Bot: '+(data.reply || data.error || 'No reply')
-        if(data.sources && data.sources.length){
-          const s = document.createElement('div'); s.style.fontSize='0.9rem'; s.style.marginTop='0.25rem'; s.textContent = 'Sources: '+data.sources.map(x=>x.title+'#'+x.chunk_index).join(', ')
-          chatEl.appendChild(s)
-        }
+        const lastBot = [...messagesEl.querySelectorAll('.message')].reverse().find(n=>n.classList.contains('bot'))
+        if(lastBot){ lastBot.remove() }
+        renderMessage(data.reply || 'No reply', 'bot', data.sources)
       }catch(err){
-        chatEl.lastChild.textContent = 'Bot: Error connecting to API'
+        const lastBot = [...messagesEl.querySelectorAll('.message')].reverse().find(n=>n.classList.contains('bot'))
+        if(lastBot){ lastBot.remove() }
+        renderMessage('Error connecting to API', 'bot')
       }
-    })
+    }
+
+    sendBtn.addEventListener('click', send)
+    input.addEventListener('keydown', (e)=>{ if(e.key === 'Enter'){ e.preventDefault(); send() }})
   </script>
 </body>
 </html>
